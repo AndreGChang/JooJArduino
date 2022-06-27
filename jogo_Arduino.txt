@@ -4,6 +4,7 @@
 //Kaue Sanches
 //Leonardo Calegario
 //data 17/06/22
+//cobra doida kkkkkk erick mo legal :)
 
 #include <Adafruit_GFX.h>     // Core graphics library
 #include <Adafruit_ST7789.h>  // Hardware-specific library for ST7789
