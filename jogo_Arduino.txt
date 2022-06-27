@@ -5,6 +5,7 @@
 //Leonardo Calegario
 //data 17/06/22
 //cobra doida kkkkkk erick mo legal :)
+//batat assada foda se loco
 
 #include <Adafruit_GFX.h>     // Core graphics library
 #include <Adafruit_ST7789.h>  // Hardware-specific library for ST7789
