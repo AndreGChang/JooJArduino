@@ -1,0 +1,558 @@
+//Andre Gabriel Chang
+//Matheus Ricardo Lopes da SIlva
+//Pedro Andrade
+//Kaue Sanches
+//Leonardo Calegario
+//data 17/06/22
+
+#include <Adafruit_GFX.h>     // Core graphics library
+#include <Adafruit_ST7789.h>  // Hardware-specific library for ST7789
+#include <SPI.h>              // Arduino SPI library
+
+// ST7789 TFT module connections
+#define TFT_CS 10
+#define TFT_RST 8  // define reset pin, or set to -1 and connect to Arduino RESET pin
+#define TFT_DC 9   // define data/command pin
+
+unsigned long delay_inimigo = millis();
+
+#define banana_w 26
+#define banana_h 28
+
+const unsigned char banana[] PROGMEM = {
+  0xfc, 0xff, 0xff, 0xf0, 0xf0, 0x7f, 0xff, 0xf0, 0xe1, 0x7f, 0xff, 0xf0, 0xef, 0x7f, 0xff, 0x10,
+  0xee, 0x9f, 0xfc, 0x00, 0xed, 0xcf, 0xc1, 0xc0, 0xc2, 0xf0, 0x0f, 0xd0, 0x9a, 0xff, 0xff, 0xd0,
+  0x9b, 0x3f, 0xff, 0x90, 0x3b, 0xdf, 0xff, 0xb0, 0x39, 0xe3, 0xff, 0x30, 0x7d, 0xfb, 0xfe, 0x10,
+  0x7d, 0xfc, 0xf1, 0x90, 0x7e, 0xff, 0x0f, 0x90, 0x7e, 0x7f, 0xff, 0x90, 0x7f, 0x3f, 0xff, 0x30,
+  0x7f, 0xdf, 0xfe, 0x70, 0x3f, 0xe7, 0xfc, 0xf0, 0xbf, 0xf8, 0xf9, 0xf0, 0x9f, 0xff, 0x03, 0xf0,
+  0xcf, 0xff, 0xf3, 0xf0, 0xe7, 0xff, 0xf7, 0xf0, 0xf3, 0xff, 0xe7, 0xf0, 0xf8, 0x7f, 0x8f, 0xf0,
+  0xfe, 0x00, 0x3f, 0xf0, 0xff, 0xc1, 0xff, 0xf0
+};
+
+#define cobra_w 20
+#define cobra_h 20
+
+const unsigned char cobra[] PROGMEM = {
+  0x03, 0xff, 0x80, 0x07, 0xff, 0xc0, 0x0f, 0xff, 0xe0, 0x0f, 0xff, 0xf0, 0x0f, 0xff, 0xf0, 0x0f,
+  0xff, 0xf0, 0x0f, 0xe7, 0xf0, 0x07, 0xf3, 0xf0, 0x03, 0xfc, 0x00, 0x21, 0xfe, 0x00, 0x60, 0xff,
+  0x00, 0xe0, 0x3f, 0x00, 0xe0, 0x1f, 0x80, 0xf0, 0x0f, 0x80, 0xf8, 0x1f, 0x80, 0xff, 0xff, 0x80,
+  0xff, 0xff, 0x80, 0xff, 0xff, 0x80, 0x7f, 0xff, 0x00, 0x1f, 0xfe, 0x00
+};
+
+#define inimigo_w 20
+#define inimigo_h 20
+
+const unsigned char inimigo1[] PROGMEM = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x30, 0x00, 0x0f, 0xa7, 0x80, 0x3f,
+  0xef, 0xe0, 0x7f, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff,
+  0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0,
+  0x7f, 0xff, 0xe0, 0x3f, 0xff, 0xe0, 0x1f, 0xff, 0xc0, 0x0f, 0xff, 0x80
+};
+
+#define banana1_w 20
+#define banana1_h 20
+
+const unsigned char banana1[] PROGMEM = {
+  0x00, 0x00, 0x00, 0xf0, 0x01, 0x00, 0xf0, 0x03, 0x00, 0xf8, 0x07, 0x00, 0xff, 0xbf, 0xc0, 0xff,
+  0xff, 0xc0, 0xff, 0xff, 0xc0, 0xff, 0xff, 0xc0, 0xff, 0xff, 0xc0, 0xff, 0xff, 0xd0, 0xff, 0xff,
+  0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0x7f, 0xff, 0xf0, 0x7f, 0xff, 0xf0, 0x7f, 0xff, 0xe0,
+  0x3f, 0xff, 0xe0, 0x1f, 0xff, 0x80, 0x0f, 0xfe, 0x00, 0x03, 0x80, 0x00
+};
+typedef struct {
+  char nome[4];
+  int pontos;
+} tp_placar;
+
+tp_placar placar[3] = { { "DFF", 20 }, { "JKL", 22 }, { "FSD", 21 } };
+
+int cursor = 0;
+int k = 80;
+int jogador_selecionado = -1;
+int vida = 3;
+
+
+// Initialize Adafruit ST7789 TFT library
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+
+
+//funcao que mexe o cursor
+void cursor_menu() {
+
+  if (digitalRead(2) == 0) {  //se for pressionado o botao 2(CIMA), o cursor anda para cima (-20 pixe)
+
+    tft.setCursor(10, 120 + cursor);  //posicao do cursor
+    tft.setTextColor(ST77XX_BLACK);   //tipo de cor do cursor
+    tft.print(">");                   //o que vai ser printado na tela
+
+    if (cursor != 0) {
+      cursor -= 20;
+    } else {
+      cursor = 60;
+    }
+
+    tft.setCursor(10, 120 + cursor);
+    tft.setTextColor(ST77XX_BLUE);
+    tft.print(">");
+  }
+  if (digitalRead(5) == 0) {  //a mesma coisa do de cima, so que o cursor anda para baixo
+
+    tft.setCursor(10, 120 + cursor);
+    tft.setTextColor(ST77XX_BLACK);
+    tft.print(">");
+
+    if (cursor != 60) {
+      cursor += 20;
+    } else {
+      cursor = 0;
+    }
+
+    tft.setCursor(10, 120 + cursor);
+    tft.setTextColor(ST77XX_BLUE);
+    tft.print(">");
+  }
+}
+
+void menu() {
+  if (digitalRead(2) == 0 && digitalRead(5) == 0) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setCursor(70, 100);
+    tft.println("BANANA");
+    tft.drawBitmap(80, 130, banana1, banana1_w, banana1_h, ST77XX_YELLOW);
+
+    delay(5000);
+    tft.fillScreen(ST77XX_BLACK);
+  }
+  tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
+  tft.setTextWrap(true);
+  tft.setTextSize(2);
+
+  tft.setCursor(30, 120);
+  tft.setTextColor(ST77XX_BLUE);
+  tft.println("jogar");
+
+  tft.setCursor(30, 140);
+  tft.setTextColor(ST77XX_BLUE);
+  tft.println("creditos");
+
+  tft.setCursor(30, 160);
+  tft.setTextColor(ST77XX_BLUE);
+  tft.println("ranking");
+
+  tft.setCursor(30, 180);
+  tft.setTextColor(ST77XX_BLUE);
+  tft.println("sair");
+}
+
+
+void creditos() {
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
+  delay(50);
+  tft.setTextWrap(true);
+  tft.setTextSize(2);
+
+
+  tft.setTextColor(ST77XX_BLUE);
+
+  tft.setCursor(30, 60);
+  tft.println("Andre G Chang");
+
+  tft.setCursor(30, 80);
+  tft.println("Pedro Andrade");
+
+  tft.setCursor(30, 100);
+  tft.println("Leonardo");
+
+  tft.setCursor(30, 120);
+  tft.println("Matheus R Lopes");
+
+  tft.setCursor(30, 140);
+  tft.println("Kaue Sanches");
+
+  delay(5000);
+
+  tft.fillScreen(ST77XX_BLACK);
+}
+
+void opcoes() {
+
+  if (digitalRead(4) == LOW) {
+
+    delay(50);
+    switch (cursor) {
+      case 0:
+        tft.fillScreen(ST77XX_BLACK);
+        tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
+        while (digitalRead(3) != LOW) {
+          delay(50);
+          tft.setTextColor(ST77XX_BLUE);
+          tft.setCursor(40, 60);
+          tft.println("SELECIONE UM");
+          tft.setCursor(70, 80);
+          tft.println("JOGADOR");
+
+          cursor_menu();
+          tft.setTextWrap(true);
+          tft.setTextSize(2);
+          tft.setTextColor(ST77XX_BLUE);
+
+          int p = 0;
+
+          tft.setCursor(30, 120);
+          tft.println("Novo Jogador");
+
+          for (int k = 0; k < 3; k++) {
+            if (strlen(placar[k].nome) != 0) {
+              tft.setCursor(30, 140 + p);
+              tft.println(placar[k].nome);
+
+              p += 20;
+            }
+          }
+
+          if (digitalRead(4) == 0) {
+
+            switch (cursor) {
+              case 0:
+                {
+                  char nome_jogador[4] = "AAA";
+                  int i = 0, x = 0;
+                  tft.fillScreen(ST77XX_BLACK);
+
+                  while (digitalRead(3) != LOW) {
+                    tft.setCursor(30, 100);
+                    tft.println("DIGITE SEU NOME");
+                    tft.setTextColor(ST77XX_BLUE);
+                    tft.setCursor(30 + x, 120);
+                    tft.println(nome_jogador[i]);
+
+
+
+                    if (digitalRead(2) == 0) {
+
+                      tft.setTextColor(ST77XX_BLACK);
+                      tft.setCursor(30 + x, 120);
+                      tft.println(nome_jogador[i]);
+
+
+                      if (nome_jogador[i] < 'Z') {
+
+
+                        nome_jogador[i]++;
+
+                      } else {
+
+                        nome_jogador[i] -= 25;
+                      }
+                    }
+
+
+                    if (digitalRead(5) == 0) {
+                      tft.setTextColor(ST77XX_BLACK);
+                      tft.setCursor(30 + x, 120);
+                      tft.println(nome_jogador[i]);
+
+                      if (nome_jogador[i] > 'A') {
+
+                        nome_jogador[i]--;
+
+                      } else {
+
+                        nome_jogador[i] += 25;
+                      }
+                    }
+
+                    if (digitalRead(4) == 0) {
+
+                      if (i < 2) {
+
+                        i++;
+                        x += 15;
+
+
+                      } else {
+                        x = -1;
+                        for (i = 0; i < 3; i++) {
+                          if (strcmp(placar[i].nome, nome_jogador) == 0) {
+                            Serial.println("TEM NOME IGUAL");
+                            tft.setCursor(30, 100);
+                            tft.println("NOME EXISTENTE");
+                            x = i;
+
+                            delay(1500);
+                            tft.fillScreen(ST77XX_BLACK);
+                          }
+                        }
+
+
+                        if (x == -1) {
+                          if (p != 0) {
+                            p /= 20;
+
+                            if (p == 3) {
+                              p = 2;
+                            }
+                          }
+
+                          strcpy(placar[p].nome, nome_jogador);
+                          tft.fillScreen(ST77XX_BLACK);
+                          tft.setCursor(10, 100);
+                          tft.println("JOGADOR ADICIONADO");
+
+                          delay(1500);
+                          tft.fillScreen(ST77XX_BLACK);
+                        }
+
+
+                        break;
+                      }
+                    }
+                    delay(100);
+                  }
+
+                  tft.fillScreen(ST77XX_BLACK);
+
+                  jogador_selecionado = 2;
+
+                  break;
+                }
+
+              case 20:
+                {
+                  jogador_selecionado = 0;
+
+
+                  break;
+                }
+              case 40:
+                {
+
+                  jogador_selecionado = 1;
+
+
+                  break;
+                }
+
+              case 60:
+                {
+
+                  jogador_selecionado = 2;
+
+                  break;
+                }
+            }
+
+            if (jogador_selecionado != -1) {
+              break;
+            }
+          }
+        }
+
+        if (jogador_selecionado != -1) {
+
+          jogo();
+        }
+
+        tft.fillScreen(ST77XX_BLACK);
+        break;
+
+      case 20:
+        creditos();
+        break;
+
+      case 40:
+        ranking();
+        tft.fillScreen(ST77XX_BLACK);
+        break;
+
+      case 60:
+        sair();
+        break;
+    }
+  }
+}
+
+void ranking() {
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
+  int q = 0;
+  int i, y;
+  tp_placar aux;
+
+
+  for (i = 0; i < 3; i++) {
+
+    for (y = i + 1; y < 3; y++) {
+      if (placar[i].pontos < placar[y].pontos) {
+
+        aux = placar[i];
+        placar[i] = placar[y];
+        placar[y] = aux;
+      }
+    }
+  }
+
+
+  for (int i = 0; i < 3; i++) {
+    if (strlen(placar[i].nome) != 0) {
+      tft.setCursor(30, 140 + q);
+      tft.println(placar[i].nome);
+      tft.setCursor(120, 140 + q);
+      tft.println(placar[i].pontos);
+
+      q += 20;
+    }
+  }
+
+  while (digitalRead(3) != 0) {
+    tft.setTextWrap(true);
+    tft.setTextSize(2);
+
+    tft.setCursor(30, 60);
+    tft.println("NOME\tPONTOS");
+  }
+}
+
+void sair() {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
+  delay(50);
+  tft.setTextWrap(true);
+  tft.setTextSize(2);
+  tft.setCursor(30, 120);
+  tft.setTextColor(ST77XX_BLUE);
+  tft.println("ate logo");
+  delay(15000);
+  tft.fillScreen(ST77XX_BLACK);
+}
+
+void titulo() {
+  tft.setTextSize(2);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setCursor(10, 70);
+  tft.println("A COBRA VAI FUMAR");
+}
+
+void jogo() {
+  int x = 240, z = 0, v = 10, altura_player = 80;
+  int sair = 1;
+  int aleatorio, altura_inimigo = 0;
+
+  tft.fillScreen(ST77XX_BLACK);
+
+  tft.drawLine(0, 60, 240, 60, ST77XX_WHITE);
+  tft.drawLine(0, 100, 240, 100, ST77XX_WHITE);
+  tft.drawLine(0, 140, 240, 140, ST77XX_WHITE);
+
+  while (digitalRead(3) != LOW) {
+    
+    tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+
+    //movimenta o personagem
+    if (digitalRead(2) == LOW) {
+      tft.fillRect(0, k, 20, 20, ST77XX_BLACK);
+
+      if (k != 40) {
+        k -= 40;
+      }
+
+      tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+    }
+
+    if (digitalRead(5) == LOW) {
+      tft.fillRect(0, k, 20, 20, ST77XX_BLACK);
+      if (k != 120) {
+        k += 40;
+      }
+
+      tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+    }
+    //fim da movimentacao do personagem
+
+    //movimentacao do inimigo
+    if (vida > 0) {
+
+        x -= v;
+      
+      if (x <= -60) {
+
+        x=240;
+
+        aleatorio = random(1, 4);
+
+        switch (aleatorio) {
+
+          case 1:
+
+            altura_inimigo = 40;
+            
+            break;
+
+          case 2:
+
+            altura_inimigo = 80;
+
+            break;
+
+          case 3:
+
+            altura_inimigo = 120;
+
+            break;
+        }
+      }
+
+      tft.fillRect(x, altura_inimigo, 20, 20, ST77XX_RED);
+      delay(130);
+      tft.fillRect(x, altura_inimigo, 20, 20, ST77XX_BLACK);
+
+      if (k == altura_inimigo) {
+
+        Serial.println(k);
+
+        if (x == 0) {
+          Serial.println("VOCE PERDEU 1 VIDA");
+          vida--;
+          Serial.println(vida);
+        }
+      }
+
+    }
+    //fim da movimentacao do inimigo
+
+    if (vida < 1) {
+      tft.fillScreen(ST77XX_BLACK);
+      tft.setCursor(10, 100);
+      tft.println("VOCE PERDEU");
+    }
+  }
+}
+
+
+void setup() {
+  Serial.begin(9600);
+
+  // if the display has CS pin try with SPI_MODE0
+  tft.init(240, 240, SPI_MODE2);  // Init ST7789 display 240x240 pixel
+  // if the screen is flipped, remove this command
+  tft.setRotation(2);
+  // put your main code here, to run repeatedly:
+
+  //======botoes======
+  pinMode(2, INPUT_PULLUP);  //cima
+  pinMode(3, INPUT_PULLUP);  //sair
+  pinMode(4, INPUT_PULLUP);  //selecionar
+  pinMode(5, INPUT_PULLUP);  //baixo
+  tft.fillScreen(ST77XX_BLACK);
+}
+
+
+void loop() {
+  titulo();
+  menu();
+  delay(90);
+  cursor_menu();
+  opcoes();
+}
