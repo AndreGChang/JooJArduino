@@ -5,7 +5,6 @@
 //Leonardo Calegario
 //data 17/06/22
 
-
 #include <Adafruit_GFX.h>     // Core graphics library
 #include <Adafruit_ST7789.h>  // Hardware-specific library for ST7789
 #include <SPI.h>              // Arduino SPI library
@@ -16,7 +15,7 @@
 #define TFT_DC 9   // define data/command pin
 
 unsigned long delay_inimigo = millis();
-
+/*
 #define banana_w 26
 #define banana_h 28
 
@@ -29,6 +28,7 @@ const unsigned char banana[] PROGMEM = {
   0xcf, 0xff, 0xf3, 0xf0, 0xe7, 0xff, 0xf7, 0xf0, 0xf3, 0xff, 0xe7, 0xf0, 0xf8, 0x7f, 0x8f, 0xf0,
   0xfe, 0x00, 0x3f, 0xf0, 0xff, 0xc1, 0xff, 0xf0
 };
+*/
 
 #define cobra_w 20
 #define cobra_h 20
@@ -43,7 +43,7 @@ const unsigned char cobra[] PROGMEM = {
 #define inimigo_w 20
 #define inimigo_h 20
 
-const unsigned char inimigo1[] PROGMEM = {
+const unsigned char inimigo[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x30, 0x00, 0x0f, 0xa7, 0x80, 0x3f,
   0xef, 0xe0, 0x7f, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff,
   0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0,
@@ -64,13 +64,13 @@ typedef struct {
   int pontos;
 } tp_placar;
 
-tp_placar placar[3] = { { "DFF", 20 }, { "JKL", 22 }, { "FSD", 21 } };
+tp_placar placar[3] = { { "DFF", 5 }, { "JKL", 3 } };
 
 int cursor = 0;
 int k = 80;
 int jogador_selecionado = -1;
 int vida = 3;
-
+int pontos=0;
 
 // Initialize Adafruit ST7789 TFT library
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
@@ -447,9 +447,10 @@ void jogo() {
   tft.drawLine(0, 100, 240, 100, ST77XX_WHITE);
   tft.drawLine(0, 140, 240, 140, ST77XX_WHITE);
 
-  while (digitalRead(3) != LOW) {
-    
-    tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+  while (vida > 0) {
+
+      tft.drawBitmap(0,k,cobra,cobra_w,cobra_h,ST77XX_GREEN);
+    //tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
 
     //movimenta o personagem
     if (digitalRead(2) == LOW) {
@@ -459,7 +460,8 @@ void jogo() {
         k -= 40;
       }
 
-      tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+        tft.drawBitmap(0,k,cobra,cobra_w,cobra_h,ST77XX_GREEN);
+      //tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
     }
 
     if (digitalRead(5) == LOW) {
@@ -467,8 +469,10 @@ void jogo() {
       if (k != 120) {
         k += 40;
       }
+      
 
-      tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+      tft.drawBitmap(0,k,cobra,cobra_w,cobra_h,ST77XX_GREEN);
+      //tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
     }
     //fim da movimentacao do personagem
 
@@ -504,31 +508,44 @@ void jogo() {
             break;
         }
       }
-
-      tft.fillRect(x, altura_inimigo, 20, 20, ST77XX_RED);
+      tft.drawBitmap(x,altura_inimigo,inimigo,inimigo_w,inimigo_h,ST77XX_RED);
+      //tft.fillRect(x, altura_inimigo, 20, 20, ST77XX_RED);
       delay(130);
       tft.fillRect(x, altura_inimigo, 20, 20, ST77XX_BLACK);
-
-      if (k == altura_inimigo) {
+      if(k != altura_inimigo && x==0){
+        pontos+=1;
+        
+      }
+      if (k == altura_inimigo && x==0) {
 
         Serial.println(k);
 
-        if (x == 0) {
           Serial.println("VOCE PERDEU 1 VIDA");
           vida--;
           Serial.println(vida);
-        }
+
       }
 
     }
     //fim da movimentacao do inimigo
-
-    if (vida < 1) {
+  }
+  if (vida < 1) {
       tft.fillScreen(ST77XX_BLACK);
+      tft.setTextColor(ST77XX_RED);
       tft.setCursor(10, 100);
       tft.println("VOCE PERDEU");
+      tft.setTextColor(ST77XX_BLUE);
+      tft.setCursor(10, 130);
+      tft.println("VOCE FEZ");
+      tft.setCursor(120, 130);
+      tft.println(pontos);
+      tft.setCursor(150, 130);
+      tft.println("PONTOS");
+      while(digitalRead(3) != LOW){
+
+      }
+
     }
-  }
 }
 
 
