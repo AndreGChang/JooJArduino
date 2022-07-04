@@ -8,13 +8,13 @@
 #include <Adafruit_GFX.h>     // Core graphics library
 #include <Adafruit_ST7789.h>  // Hardware-specific library for ST7789
 #include <SPI.h>              // Arduino SPI library
-
+#include <EEPROM.h>
 // ST7789 TFT module connections
 #define TFT_CS 10
 #define TFT_RST 8  // define reset pin, or set to -1 and connect to Arduino RESET pin
 #define TFT_DC 9   // define data/command pin
 
-unsigned long delay_inimigo = millis();
+
 /*
 #define banana_w 26
 #define banana_h 28
@@ -59,19 +59,42 @@ const unsigned char banana1[] PROGMEM = {
   0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0x7f, 0xff, 0xf0, 0x7f, 0xff, 0xf0, 0x7f, 0xff, 0xe0,
   0x3f, 0xff, 0xe0, 0x1f, 0xff, 0x80, 0x0f, 0xfe, 0x00, 0x03, 0x80, 0x00
 };
+
+#define coracao_w 20
+#define coracao_h 20
+
+const unsigned char coracao[] PROGMEM = {
+  0x00, 0x00, 0x00, 0x0f, 0x0f, 0x00, 0x1f, 0x9f, 0x80, 0x3f, 0xff, 0xc0, 0x7f, 0xff, 0xe0, 0xff,
+  0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xf0, 0xff, 0xff,
+  0xf0, 0x7f, 0xff, 0xe0, 0x3f, 0xff, 0xc0, 0x1f, 0xff, 0x80, 0x0f, 0xff, 0x00, 0x07, 0xfe, 0x00,
+  0x03, 0xfc, 0x00, 0x01, 0xf8, 0x00, 0x00, 0xf0, 0x00, 0x00, 0x60, 0x00
+};
+
 typedef struct {
   char nome[4];
   int pontos;
 } tp_placar;
 
-tp_placar placar[3] = { { "DFF", 5 }, { "JKL", 3 } };
+//struck do placar
+tp_placar placar[3];
+
 
 int cursor = 0;
 int k = 80;
 int jogador_selecionado = -1;
-int vida = 3;
-int pontos=0;
+int vida;
+int pontos_jogador = 0;
+int v = 20;
 
+
+/*
+cursor = usado para mexer o cursor
+k= onde o player inicia
+jogador_selecionado = verifica qual jogador foi selecionado
+vida = as vidas do player
+pontos_jogador = recebe os pontos que o jogador fez
+v = variavel de decremento do movimento do inimigo 
+*/
 // Initialize Adafruit ST7789 TFT library
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
@@ -181,11 +204,16 @@ void opcoes() {
   if (digitalRead(4) == LOW) {
 
     delay(50);
+
     switch (cursor) {
+
       case 0:
+
         tft.fillScreen(ST77XX_BLACK);
         tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
+
         while (digitalRead(3) != LOW) {
+
           delay(50);
           tft.setTextColor(ST77XX_BLUE);
           tft.setCursor(40, 60);
@@ -203,11 +231,15 @@ void opcoes() {
           tft.setCursor(30, 120);
           tft.println("Novo Jogador");
 
+          //mostra os jogadores que ja tinham no placar
           for (int k = 0; k < 3; k++) {
+            //verifica se acabou o nome dele se sim pula 20 pixels(p+=20)
             if (strlen(placar[k].nome) != 0) {
               tft.setCursor(30, 140 + p);
               tft.println(placar[k].nome);
 
+              tft.setCursor(110,140 + p);
+              tft.println(placar[k].pontos);
               p += 20;
             }
           }
@@ -217,9 +249,11 @@ void opcoes() {
             switch (cursor) {
               case 0:
                 {
+                  //ja preenchemos a string com AAA para saber onde ele esta(usuario);
                   char nome_jogador[4] = "AAA";
                   int i = 0, x = 0;
                   tft.fillScreen(ST77XX_BLACK);
+
 
                   while (digitalRead(3) != LOW) {
                     tft.setCursor(30, 100);
@@ -229,73 +263,103 @@ void opcoes() {
                     tft.println(nome_jogador[i]);
 
 
-
+                    //se o botao for apertado ele vai passando de letra em letra
                     if (digitalRead(2) == 0) {
 
                       tft.setTextColor(ST77XX_BLACK);
+
                       tft.setCursor(30 + x, 120);
                       tft.println(nome_jogador[i]);
 
-
+                      //usando a tabela ASCII fazemos a contagem das letras
                       if (nome_jogador[i] < 'Z') {
 
-
+                        //adiciona +1 no contador das letras
                         nome_jogador[i]++;
 
                       } else {
 
+                        //quando o contador chega no Z(90) ele reseta para a letra A(65)
                         nome_jogador[i] -= 25;
                       }
                     }
 
-
+                    //se o botao for apertado ele vai voltando de letra em letra
                     if (digitalRead(5) == 0) {
+
                       tft.setTextColor(ST77XX_BLACK);
                       tft.setCursor(30 + x, 120);
                       tft.println(nome_jogador[i]);
 
+                      //ele vai diminuindo o contador das letras
                       if (nome_jogador[i] > 'A') {
 
+                        //diminui -1 no contador das letras
                         nome_jogador[i]--;
 
                       } else {
-
+                        //se o contador for maior que a etra A(65) ele volta pro Z(90)
                         nome_jogador[i] += 25;
                       }
                     }
 
+                    //confirma a letra baseado no contador
                     if (digitalRead(4) == 0) {
 
+                      //se i for menor que 2 ele passa pra proxima letras(para nao ficar tudo no mesmo lugar)
                       if (i < 2) {
-
+                        //adiciona i+1 na string
                         i++;
+                        //adiciona na variavels de mostras as letras uns pixels para que as letras na ficarem no mesmo lugar
                         x += 15;
 
 
                       } else {
+
+                        //pega uma possicao nova no vetor
                         x = -1;
+
+                        //percorre o vetor para verificar se existem nomes iguais
                         for (i = 0; i < 3; i++) {
+
+                          //se o nome for igual ira dar 0 como resposta
                           if (strcmp(placar[i].nome, nome_jogador) == 0) {
+
+                            //mostra para o ususario que tem um nome igual
                             Serial.println("TEM NOME IGUAL");
+                            tft.fillScreen(ST77XX_BLACK);
                             tft.setCursor(30, 100);
                             tft.println("NOME EXISTENTE");
+
+                            //x vale a possicao de onde foi encontrado o nome igual
                             x = i;
+
+                            //copia para a posicao do vetor onde foi encontrado o noe igual
+                            strcpy(placar[x].nome, nome_jogador);
 
                             delay(1500);
                             tft.fillScreen(ST77XX_BLACK);
+                            jogador_selecionado = i;
                           }
+
+                          
                         }
 
-
+                        //se na for encontrado nenhum nome igual
                         if (x == -1) {
+
                           if (p != 0) {
+                            //dividimos a diferenca de pixels entre o nome dos jogadores para saber quantos tem adicionado ate agora
                             p /= 20;
 
+                            //se a divisao de p for igual a 3
                             if (p == 3) {
+                              //ha o numero total de jogadores ou seja p=2
                               p = 2;
                             }
                           }
 
+                          //copia o que foi selecionado pelo usuario para a posicao da da struct p==2(posicao final vo vetor)
                           strcpy(placar[p].nome, nome_jogador);
                           tft.fillScreen(ST77XX_BLACK);
                           tft.setCursor(10, 100);
@@ -303,6 +367,10 @@ void opcoes() {
 
                           delay(1500);
                           tft.fillScreen(ST77XX_BLACK);
+
+                          //jogador novo ocupa a ultima posicao do vetor
+                          jogador_selecionado = p;
+
                         }
 
 
@@ -314,23 +382,25 @@ void opcoes() {
 
                   tft.fillScreen(ST77XX_BLACK);
 
-                  jogador_selecionado = 2;
-
+                  
+                  //placar[2].pontos=pontos_jogador;
                   break;
                 }
 
               case 20:
                 {
+                  //quando seleciona o jogador na possicao que esta mostrando na tela ele pega os dados desse jogador
                   jogador_selecionado = 0;
-
+                  
 
                   break;
                 }
               case 40:
                 {
 
+                  //quando seleciona o jogador na possicao que esta mostrando na tela ele pega os dados desse jogador
                   jogador_selecionado = 1;
-
+                  
 
                   break;
                 }
@@ -338,20 +408,24 @@ void opcoes() {
               case 60:
                 {
 
+                  //quando seleciona o jogador na possicao que esta mostrando na tela ele pega os dados desse jogador
                   jogador_selecionado = 2;
+                  
 
                   break;
                 }
             }
 
+            //caso nao tiver nenum jogador existente ele quebra o loop e adiciona o jogador
             if (jogador_selecionado != -1) {
               break;
             }
           }
         }
 
+        //verificacao de iniciar o jogo
         if (jogador_selecionado != -1) {
-
+          vida = 3;
           jogo();
         }
 
@@ -359,6 +433,7 @@ void opcoes() {
         break;
 
       case 20:
+
         creditos();
         break;
 
@@ -378,7 +453,10 @@ void ranking() {
 
   tft.fillScreen(ST77XX_BLACK);
   tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
+
+
   int q = 0;
+  
   int i, y;
   tp_placar aux;
 
@@ -391,9 +469,11 @@ void ranking() {
         aux = placar[i];
         placar[i] = placar[y];
         placar[y] = aux;
+
       }
     }
   }
+
 
 
   for (int i = 0; i < 3; i++) {
@@ -417,140 +497,300 @@ void ranking() {
 }
 
 void sair() {
+  //seta a cor do que vai preencher a tela
   tft.fillScreen(ST77XX_BLACK);
+  //desenha um retangulo verde
   tft.drawRect(0, 0, 240, 240, ST77XX_GREEN);
   delay(50);
+  //se o texto estourar a tela ele continua na proxima linha
   tft.setTextWrap(true);
+  //tamanho do texto
   tft.setTextSize(2);
+  //coordenadas de onde vai mostrar no display
   tft.setCursor(30, 120);
+  //cor do texto
   tft.setTextColor(ST77XX_BLUE);
+  //o que vai ser mostrado
   tft.println("ate logo");
   delay(15000);
   tft.fillScreen(ST77XX_BLACK);
 }
 
 void titulo() {
+  //tamanho do texto
   tft.setTextSize(2);
+  //cor do texto
   tft.setTextColor(ST77XX_GREEN);
+  //coordenadas de onde vai mostrar no display
   tft.setCursor(10, 70);
+  //o que vai ser mostrado
   tft.println("A COBRA VAI FUMAR");
 }
 
 void jogo() {
-  int x = 240, z = 0, v = 10, altura_player = 80;
+
+    pontos_jogador=placar[jogador_selecionado].pontos;
+    
+  /*variaveis da funcao jogo
+    x=onde o inimigo comeca 
+    altura_player = altura  do player
+    aleatorio = recebe random(1,4)
+    altura_inimigo = altura do inimigo
+  */
+
+  int x = 240;
   int sair = 1;
   int aleatorio, altura_inimigo = 0;
+  
 
   tft.fillScreen(ST77XX_BLACK);
 
+
+  tft.drawBitmap(10, 200, coracao, coracao_w, coracao_h, ST77XX_RED);
+  tft.drawBitmap(40, 200, coracao, coracao_w, coracao_h, ST77XX_RED);
+  tft.drawBitmap(70, 200, coracao, coracao_w, coracao_h, ST77XX_RED);
+
+  tft.setTextColor(ST77XX_BLUE);
+  tft.setCursor(110, 200);
+  tft.println("PONTOS:");
+
+  //imprime as plataformas que o perconagem podem andar
   tft.drawLine(0, 60, 240, 60, ST77XX_WHITE);
   tft.drawLine(0, 100, 240, 100, ST77XX_WHITE);
   tft.drawLine(0, 140, 240, 140, ST77XX_WHITE);
 
+  //loop que continua ate as vidas acabarem
   while (vida > 0) {
 
-      tft.drawBitmap(0,k,cobra,cobra_w,cobra_h,ST77XX_GREEN);
-    //tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+    //imprime o personagem no mapa
+    tft.drawBitmap(0, k, cobra, cobra_w, cobra_h, ST77XX_GREEN);
+
 
     //movimenta o personagem
     if (digitalRead(2) == LOW) {
+
+      //apaga a posicao antiga do player
       tft.fillRect(0, k, 20, 20, ST77XX_BLACK);
 
+      //player anda para cima ate que sua posicao na seja 40
       if (k != 40) {
         k -= 40;
       }
 
-        tft.drawBitmap(0,k,cobra,cobra_w,cobra_h,ST77XX_GREEN);
-      //tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+      //imprime de novo o player
+      tft.drawBitmap(0, k, cobra, cobra_w, cobra_h, ST77XX_GREEN);
     }
 
+    //movimenta o personagem
     if (digitalRead(5) == LOW) {
+
+      //imprime o personagem no mapa
       tft.fillRect(0, k, 20, 20, ST77XX_BLACK);
+
+      //player anda para cima ate que sua posicao na seja 40
       if (k != 120) {
         k += 40;
       }
-      
 
-      tft.drawBitmap(0,k,cobra,cobra_w,cobra_h,ST77XX_GREEN);
-      //tft.fillRect(0, k, 20, 20, ST77XX_GREEN);
+      //imprime de novo o player
+      tft.drawBitmap(0, k, cobra, cobra_w, cobra_h, ST77XX_GREEN);
     }
     //fim da movimentacao do personagem
 
     //movimentacao do inimigo
+    //enquanto o player tiver vidas o inimigo anda
     if (vida > 0) {
 
-        x -= v;
-      
+      //posicao antiga do inimigo - posicao atual faz ele andar no eixo X
+      x -= v;
+
+      //se  a posicao do inimigo X for menor que X-60
       if (x <= -60) {
+        //reseta a posicao de novo
+        x = 240;
 
-        x=240;
-
+        //funcao random
         aleatorio = random(1, 4);
 
+        //switch recebe aleatoiro para mudar a posicao do inimigo no eixo Y
         switch (aleatorio) {
 
           case 1:
 
+            //altera a posicao do inimigo no eixo Y
             altura_inimigo = 40;
-            
+
             break;
 
           case 2:
 
+            //altera a posicao do inimigo no eixo Y
             altura_inimigo = 80;
 
             break;
 
           case 3:
 
+            //altera a posicao do inimigo no eixo Y
             altura_inimigo = 120;
 
             break;
         }
       }
-      tft.drawBitmap(x,altura_inimigo,inimigo,inimigo_w,inimigo_h,ST77XX_RED);
-      //tft.fillRect(x, altura_inimigo, 20, 20, ST77XX_RED);
+
+      //imprime o inimigo na tela
+      tft.drawBitmap(x, altura_inimigo, inimigo, inimigo_w, inimigo_h, ST77XX_RED);
+
       delay(130);
+
+      //apaga o inimigo da tela
       tft.fillRect(x, altura_inimigo, 20, 20, ST77XX_BLACK);
-      if(k != altura_inimigo && x==0){
-        pontos+=1;
-        
+
+      //faza  colisao do inimigo com o player para somar os pontos
+      if (k != altura_inimigo && x == 0) {
+
+      //se nao colidir soma os pontos
+        pontos_jogador += 1;
+
+        placar[jogador_selecionado].pontos=pontos_jogador;
+
+        tft.setCursor(190, 200);
+        tft.fillRect(190,200,30,30,ST77XX_BLACK);
+        tft.println(pontos_jogador);
+
+
+        //se pontos for maior que 15
+        if (pontos_jogador > 15) {
+
+          //o decremento aumneta deixando o inimigo mais rapido
+          v = 30;
+        }
+
+        //faza  colisao do inimigo com o player para somar os pontos
+        if (pontos_jogador > 25) {
+
+          //o decremento aumneta deixando o inimigo mais rapido
+          v = 40;
+        }
+
+        //faza  colisao do inimigo com o player para somar os pontos
+        if (pontos_jogador > 35) {
+
+          //o decremento aumneta deixando o inimigo mais rapido
+          v = 60;
+        }
+
+        //faza  colisao do inimigo com o player para somar os pontos
+        if (pontos_jogador > 40) {
+
+          //o decremento aumneta deixando o inimigo mais rapido
+          v = 80;
+        }
+
+        Serial.print("PONTOS: ");
+        Serial.println(pontos_jogador);
       }
-      if (k == altura_inimigo && x==0) {
 
-        Serial.println(k);
+      //se o player estiver na mesma altura que o inimigo
+      if (k == altura_inimigo && x == 0) {
 
-          Serial.println("VOCE PERDEU 1 VIDA");
-          vida--;
-          Serial.println(vida);
+        //perde uma vida
+        vida--;
+        Serial.print("PERDEU VIDA");
+        Serial.println(vida);
 
+        if (vida < 3) {
+
+          tft.drawBitmap(10, 200, coracao, coracao_w, coracao_h, ST77XX_BLACK);
+        }
+
+        if (vida < 2) {
+
+          tft.drawBitmap(40, 200, coracao, coracao_w, coracao_h, ST77XX_BLACK);
+        }
+
+        if (vida < 1) {
+
+          tft.drawBitmap(70, 200, coracao, coracao_w, coracao_h, ST77XX_BLACK);
+        }
       }
-
     }
     //fim da movimentacao do inimigo
   }
+
+  //se a vida for menor que 1 ou seja 0
   if (vida < 1) {
-      tft.fillScreen(ST77XX_BLACK);
-      tft.setTextColor(ST77XX_RED);
-      tft.setCursor(10, 100);
-      tft.println("VOCE PERDEU");
-      tft.setTextColor(ST77XX_BLUE);
-      tft.setCursor(10, 130);
-      tft.println("VOCE FEZ");
-      tft.setCursor(120, 130);
-      tft.println(pontos);
-      tft.setCursor(150, 130);
-      tft.println("PONTOS");
-      while(digitalRead(3) != LOW){
 
-      }
+    //ira mostrar voce perdeu e quantos pontos voce fez
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setTextColor(ST77XX_RED);
+    tft.setCursor(50, 100);
+    tft.println("VOCE PERDEU");
+    tft.setTextColor(ST77XX_BLUE);
+    tft.setCursor(10, 130);
+    tft.println("VOCE FEZ");
+    tft.setCursor(120, 130);
+    tft.println(pontos_jogador);
+    tft.setCursor(150, 130);
+    tft.println("PONTOS");
 
+    while (digitalRead(3) != LOW) {
     }
+  }
+
+  //organiza a astruct baseado nos pontos
+  int i, y;
+  tp_placar aux;
+
+  for (i = 0; i < 3; i++) {
+
+    for (y = i + 1; y < 3; y++) {
+      if (placar[i].pontos < placar[y].pontos) {
+
+        aux = placar[i];
+        placar[i] = placar[y];
+        placar[y] = aux;
+      }
+    }
+  }
+
+  //para caso nao for selecionado nenhuma opcao no sub-menu ele nao iniciar o jogo(era um bug antes)
+  jogador_selecionado = -1;
+
+  //variavel para o endereco de onde sera armazenado na EEPROM 
+  int address = 0;
+
+  //comando para salvar na EEPROM "address = endereco de onde sera salvo" "placar = o que eu quero salvar"
+  EEPROM.put(address,placar);
+
+  address += sizeof(placar);
+
+
+
+  //caso fossemos salvar mais coisas teriamos que somar o endereco + o conteudo
+  //address += sizeof(placar);
+
 }
 
 
 void setup() {
   Serial.begin(9600);
+
+  //para limpar a EEPROM
+  /*
+  for (int i = 0 ; i < EEPROM.length() ; i++) {
+    EEPROM.write(i, 0);
+  }
+  */
+
+  int address = 0;
+
+  EEPROM.get(address,placar);
+  
+  address += sizeof(placar);
+  
+
+
 
   // if the display has CS pin try with SPI_MODE0
   tft.init(240, 240, SPI_MODE2);  // Init ST7789 display 240x240 pixel
